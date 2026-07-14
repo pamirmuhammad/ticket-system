@@ -13,17 +13,27 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
 
+    private static final String CI_DB_URL = System.getenv("SPRING_DATASOURCE_URL");
+
     @Container
     @SuppressWarnings("resource")
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("ticket_system_test")
-            .withUsername("test")
-            .withPassword("test");
+    static PostgreSQLContainer<?> postgres = CI_DB_URL == null
+            ? new PostgreSQLContainer<>("postgres:16-alpine")
+                .withDatabaseName("ticket_system_test")
+                .withUsername("test")
+                .withPassword("test")
+            : null;
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+        if (CI_DB_URL != null) {
+            registry.add("spring.datasource.url", () -> CI_DB_URL);
+            registry.add("spring.datasource.username", () -> System.getenv("SPRING_DATASOURCE_USERNAME"));
+            registry.add("spring.datasource.password", () -> System.getenv("SPRING_DATASOURCE_PASSWORD"));
+        } else {
+            registry.add("spring.datasource.url", postgres::getJdbcUrl);
+            registry.add("spring.datasource.username", postgres::getUsername);
+            registry.add("spring.datasource.password", postgres::getPassword);
+        }
     }
 }
